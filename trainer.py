@@ -4,6 +4,7 @@
 import os
 import numpy as np
 from tqdm import tqdm
+from datetime import datetime
 from collections import OrderedDict
 import torch
 from utils import psnr
@@ -14,7 +15,7 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 class Trainer(object):
 
-    def __init__(self, model, criterion, optimizer, scheculer=None, callbacks=None):
+    def __init__(self, model, criterion, optimizer, scheduler=None, callbacks=None):
 
         self.model = model
         self.criterion = criterion
@@ -35,10 +36,13 @@ class Trainer(object):
         elif isinstance(init_epoch, int):
             assert 'Please enter int to init_epochs'
 
-        _, columns = os.popen('stty size', 'r').read().split()
-        columns = int(columns) // 2
+        # _, columns = os.popen('stty size', 'r').read().split()
+        # columns = int(columns) // 2
+        columns = 200
 
         for epoch in range(init_epoch, epochs):
+            dt_now = datetime.now()
+            print(dt_now)
             self.model.train()
             mode = 'Train'
             train_loss = []
@@ -50,7 +54,7 @@ class Trainer(object):
                     loss = self._step(inputs, labels)
                     train_loss.append(loss.item())
                     psnr_show = psnr(loss)
-                    self._step_show(pbar, mode, epoch, loss, psnr_show)
+                    self._step_show(pbar, Loss=f'{loss:.7f}', PSNR=f'{psnr_show:.7f}')
                     torch.cuda.empty_cache()
             mode = 'Val'
             self.model.eval()
@@ -62,7 +66,7 @@ class Trainer(object):
                         loss = self._step(inputs, labels, train=False)
                     val_loss.append(loss.item())
                     psnr_show = psnr(loss)
-                    self._step_show(pbar, mode, epoch, loss, psnr_show)
+                    self._step_show(pbar, Loss=f'{loss:.7f}', PSNR=f'{psnr_show:.7f}')
                     torch.cuda.empty_cache()
             train_loss = np.mean(train_loss)
             val_loss = np.mean(val_loss)
@@ -91,23 +95,28 @@ class Trainer(object):
             self.optimizer.step()
         return loss
 
-    def _step_show(self, pbar, mode, epoch, loss, psnr_show):
+    # def _step_show(self, pbar, mode, epoch, loss, psnr_show):
+    #     if device == 'cuda':
+    #         pbar.set_postfix(
+    #             OrderedDict(
+    #                 Loss=f'{loss:.7f}',
+    #                 PSNR=f'{psnr_show:.7f}',
+    #                 Allocate=f'{torch.cuda.memory_allocated(0) / 1024 ** 3:.3f}GB',
+    #                 Cache=f'{torch.cuda.memory_cached(0) / 1024 ** 3:.3f}GB'
+    #             )
+    #         )
+    #     elif device == 'cpu':
+    #         pbar.set_postfix(
+    #             OrderedDict(
+    #                 Loss=f'{loss:.7f};',
+    #                 PSNR=f'{psnr_show:.7f}'
+    #             )
+    #         )
+    def _step_show(self, pbar, *args, **kwargs):
         if device == 'cuda':
-            pbar.set_postfix(
-                OrderedDict(
-                    Loss=f'{loss:.7f}',
-                    PSNR=f'{psnr_show:.7f}',
-                    Allocate=f'{torch.cuda.memory_allocated(0) / 1024 ** 3:.3f}GB',
-                    Cache=f'{torch.cuda.memory_cached(0) / 1024 ** 3:.3f}GB'
-                )
-            )
-        elif device == 'cpu':
-            pbar.set_postfix(
-                OrderedDict(
-                    Loss=f'{loss:.7f};',
-                    PSNR=f'{psnr_show:.7f}'
-                )
-            )
+            kwargs['Allocate']=f'{torch.cuda.memory_allocated(0) / 1024 ** 3:.3f}GB'
+            kwargs['Cache']=f'{torch.cuda.memory_cached(0) / 1024 ** 3:.3f}GB'
+        pbar.set_postfix(kwargs)
         return self
 
 

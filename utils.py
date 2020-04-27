@@ -6,6 +6,7 @@ import shutil
 import scipy.io
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 from PIL import Image
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -16,18 +17,17 @@ import torchvision
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
-def make_patch(data_path, save_path, size=256, ch=24):
+def make_patch(data_path, save_path, size=256, ch=24, data_key='data'):
 
     if os.path.exists(save_path):
         shutil.rmtree(save_path)
     os.mkdir(save_path)
 
     data_list = os.listdir(data_path)
-    for i, name in enumerate(data_list):
-        print(name)
+    for i, name in enumerate(tqdm(data_list)):
         idx = name.split('.')[0]
         f = scipy.io.loadmat(os.path.join(data_path, name))
-        data = f['data']
+        data = f[data_key]
         data = np.expand_dims(np.asarray(
             data, np.float32).transpose([2, 0, 1]), axis=0)
         tensor_data = torch.as_tensor(data)
@@ -35,8 +35,7 @@ def make_patch(data_path, save_path, size=256, ch=24):
         patch_data = patch_data.permute(
             (0, 2, 3, 1, 4, 5)).reshape(-1, ch, size, size)
         for i in range(patch_data.size()[0]):
-            print(i)
-            save_data = patch_data[i].to('cpu').detach().numpy().copy()
+            save_data = patch_data[i].to('cpu').detach().numpy().copy().transpose(1, 2, 0)
             save_name = os.path.join(save_path, f'{idx}_{i}.mat')
             scipy.io.savemat(save_name, {'data': save_data})
 

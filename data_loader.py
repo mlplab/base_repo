@@ -6,9 +6,6 @@ import torch
 import torchvision
 import numpy as np
 import scipy.io as sio
-from PIL import Image
-import matplotlib.pyplot as plt
-import utils
 
 
 data_path = 'dataset/'
@@ -17,7 +14,7 @@ size = 256
 
 class HyperSpectralDataset(torch.utils.data.Dataset):
 
-    def __init__(self, img_path, mask_path, transform=None):
+    def __init__(self, img_path, mask_path, concat=False, transform=None):
 
         self.img_path = img_path
         self.data = os.listdir(img_path)
@@ -25,6 +22,7 @@ class HyperSpectralDataset(torch.utils.data.Dataset):
         mask = sio.loadmat(mask_path)['data'].astype(np.float32)
         self.mask = torchvision.transforms.ToTensor()(mask)
         self.data_len = len(self.data)
+        self.concat = concat
         self.transforms = transform
 
     def __getitem__(self, idx):
@@ -39,14 +37,17 @@ class HyperSpectralDataset(torch.utils.data.Dataset):
         trans_data = nd_data
         # trans_data = torchvision.transforms.ToTensor()(nd_data)
         measurement_data = torch.sum(trans_data * self.mask, dim=0).unsqueeze(0)
-        input_data = torch.cat([measurement_data, self.mask], dim=0)
+        if self.concat is True:
+            input_data = torch.cat([measurement_data, self.mask], dim=0)
+        else:
+            input_data = measurement_data
         return input_data, trans_data
 
     def __len__(self):
         return self.data_len
 
 
-class RefineEvaluateDataset(torch.utils.data.Dataset):
+class RefineEvaluateDataset_Random(torch.utils.data.Dataset):
 
     def __init__(self, img_path, label_path, band=24, transform=None):
 
@@ -57,18 +58,52 @@ class RefineEvaluateDataset(torch.utils.data.Dataset):
         self.data_len = len(self.img_data)
         self.band = band
         self.transform = transform
+        self.to_tensor = torchvision.transforms.ToTensor()
+        self.norm = torchvision.transforms.Normalize((.5,), (.5,))
 
     def __getitem__(self, idx):
 
         # choice_band = np.random.choice(self.band)
         img_data = sio.loadmat(os.path.join(self.img_path, self.img_data[idx]))['data'][:, :, self.band]
         nd_data = np.array(img_data, dtype=np.float32)
-        nd_data = torchvision.transforms.ToTensor()(nd_data)
+        # nd_data = torchvision.transforms.ToTensor()(nd_data)
+        input_data = self.norm(self.to_tensor(nd_data))
         label_data = sio.loadmat(os.path.join(self.label_path, self.label_data[idx]))['data'][:, :, self.band]
         label_data = np.array(label_data, dtype=np.float32)
-        label_data = torchvision.transforms.ToTensor()(label_data)
-        return nd_data, label_data
+        label_data = self.norm(self.to_tensor(label_data))
+        return input_data, label_data
 
     def __len__(self):
         return self.data_len
-a
+
+
+class RefineEvaluateDataset(torch.utils.data.Dataset):
+
+    def __init__(self, img_path, label_path, transform=None, tanh=False):
+
+        self.img_path = img_path
+        self.img_data = os.listdir(img_path)
+        self.label_path = label_path
+        self.label_data = os.listdir(label_path)
+        self.data_len = len(self.img_data)
+        self.transform = transform
+        self.tanh = tanh
+        self.to_tensor = torchvision.transforms.ToTensor()
+        self.norm = torchvision.transforms.Normalize((.5,), (.5,))
+
+    def __getitem__(self, idx):
+
+        img_data = sio.loadmat(os.path.join(self.img_path, self.img_data[idx]))['data']
+        nd_data = np.array(img_data, dtype=np.float32)
+        input_data = self.to_tensor(nd_data)
+        if self.tanh is True:
+            input_data = self.norm(input_data)
+        label_data = sio.loadmat(os.path.join(self.label_path, self.label_data[idx]))['data']
+        label_data = np.array(label_data, dtype=np.float32)
+        label_data = self.to_tensor(label_data)
+        if self.tanh is True:
+            label_data = self.norm(label_data)
+        return input_data, label_data
+
+    def __len__(self):
+        return self.data_len
