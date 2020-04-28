@@ -17,6 +17,10 @@ import torchvision
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
+def normalize(x):
+    return (x - x.min()) / (x.max() - x.min())
+
+
 def make_patch(data_path, save_path, size=256, ch=24, data_key='data'):
 
     if os.path.exists(save_path):
@@ -88,7 +92,7 @@ class RandomHorizontalFlip(object):
 
 class ModelCheckPoint(object):
 
-    def __init__(self, checkpoint_path, model_name, mkdir=False, partience=1, verbose=True):
+    def __init__(self, checkpoint_path, model_name, mkdir=False, partience=1, verbose=True, *args, **kwargs):
         self.checkpoint_path = checkpoint_path
         self.model_name = model_name
         self.partience = partience
@@ -97,6 +101,13 @@ class ModelCheckPoint(object):
             if os.path.exists(self.checkpoint_path):
                 shutil.rmtree(self.checkpoint_path)
             os.makedirs(self.checkpoint_path)
+        self.colab2drive_idx = 0
+        if 'colab2drive' in kwargs.keys():
+            self.colab2drive = kwargs['colab2drive']
+            self.colab2drive_path = kwargs['colab2drive_path']
+            self.colab2drive_flag = True
+        else:
+            self.colab2drive_flag = False
 
     def callback(self, model, epoch, *args, **kwargs):
         if 'loss' not in kwargs.keys() and 'val_loss' not in kwargs.keys():
@@ -110,6 +121,12 @@ class ModelCheckPoint(object):
             torch.save(model.state_dict(), checkpoint_name)
             if self.verbose is True:
                 print(f'CheckPoint Saved by {checkpoint_name}')
+        if self.colab2drive_flag is True and epoch == self.colab2drive[self.colab2drive_idx]:
+            torch.save({'model_state_dict': model.state_dict(),
+                        'epoch': epoch,
+                        'optim': kwargs['optim']},
+                        os.path.join(self.colab2drive_path, self.model_name + f'_epoch_{epoch:05d}_loss_{loss:.5f}_valloss_{val_loss:.5f}.tar')
+                        )
         return self
 
 

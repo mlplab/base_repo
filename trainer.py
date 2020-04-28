@@ -48,7 +48,7 @@ class Trainer(object):
             train_loss = []
             val_loss = []
             desc_str = f'{mode:>5} Epoch: {epoch + 1:05d} / {epochs:05d}'
-            with tqdm(train_dataloader, desc=desc_str, ncols=columns, unit='step') as pbar:
+            with tqdm(train_dataloader, desc=desc_str, ncols=columns, unit='step', ascii=True) as pbar:
                 for i, (inputs, labels) in enumerate(pbar):
                     inputs, labels = self._trans_data(inputs, labels)
                     loss = self._step(inputs, labels)
@@ -59,7 +59,7 @@ class Trainer(object):
             mode = 'Val'
             self.model.eval()
             desc_str = f'{mode:>5} Epoch: {epoch + 1:05d} / {epochs:05d}'
-            with tqdm(val_dataloader, desc=desc_str, ncols=columns, unit='step') as pbar:
+            with tqdm(val_dataloader, desc=desc_str, ncols=columns, unit='step', ascii=True) as pbar:
                 for i, (inputs, labels) in enumerate(pbar):
                     inputs, labels = self._trans_data(inputs, labels)
                     with torch.no_grad():
@@ -73,7 +73,7 @@ class Trainer(object):
             if self.callbacks:
                 for callback in self.callbacks:
                     callback.callback(self.model, epoch, loss=train_loss,
-                                      val_loss=val_loss, save=True, device=device)
+                                      val_loss=val_loss, save=True, device=device, optim=self.optimizer)
             if self.scheduler is not None:
                 self.scheduler.step()
             print('-' * int(columns))
